@@ -1,0 +1,320 @@
+#! /usr/bin/python3
+
+import os
+import sys
+import json
+import cgi
+
+
+def error_400():
+	print("400 Bad Request")
+	print()
+	sys.exit(0)
+
+def error_404():
+	print("Status: 404 Not Found")
+	print()
+	sys.exit(0)
+
+
+
+def get_all_students(data): #DONE
+	#generate link
+	#loop through student list, add/update link (not adding to json, since it 
+	#is not supposed to be added to a record)
+
+	#link used here (and for other get functions) is for localhost, since 
+	#portforwarding isn't part of this project, though link contents would 
+	#change if this were different
+	students = data["students"]
+	for i in students:
+		i["link"] = "http://127.0.0.1:8080/cgi-bin/school/students/" + str(i["id"])
+
+	#print out students from data dictionary
+	print("Status: 200 OK")
+	print("Content-Type: text/html")
+	print()
+	
+	print(json.dumps(students, indent=2))
+
+
+
+def post_new_student(data):#DONE
+	#recieved data
+	new_rec = json.loads(sys.stdin.read())
+
+	#take given data, make sure it is correct and add to students
+	if "id" not in new_rec or type(new_rec["id"]) != int or "name" not in new_rec or type(new_rec["name"]) != str:
+		error_400()
+
+	else:
+		new_rec_append = {"id": new_rec["id"], "name": new_rec["name"], "courses": []}
+
+		#for the post to succeed, found needs to remain false
+		found = False
+		#check if id is unique
+		for i in data["students"]:
+			if i["id"] == new_rec_append["id"]:
+				found = True
+				break
+
+		#if record does not match existing one, then print, otherwise 400 bad request
+		if not found:
+			data["students"].append(new_rec_append)
+			with open("BACKING_STORE", "w") as file:
+				file.write(json.dumps(data, indent=2))
+
+				print("300 Redirect")
+				print("Location: /cgi-bin/school")
+				print()
+		else:
+			error_400()
+
+
+
+def get_all_courses(data): #DONE
+	#generate link
+	courses = data["courses"]
+	for i in courses:
+		i["link"] = "http://127.0.0.1:8080/cgi-bin/school/courses/" + str(i["id"])
+
+	#print out courses from data dictionary
+	print("Status: 200 OK")
+	print("Content-Type: text/html")
+	print()
+	
+	print(json.dumps(courses, indent=2))
+
+
+
+def post_new_course(data): #DONE
+	#recieved data
+	new_rec = json.loads(sys.stdin.read())
+
+	#take given data, make sure it is correct and add to courses
+	if "id" not in new_rec or type(new_rec["id"]) != int:
+		error_400()
+
+	else:
+		new_rec_append = {"id": new_rec["id"]}
+		data["courses"].append(new_rec_append)
+		with open("BACKING_STORE", "w") as file:
+			file.write(json.dumps(data, indent=2))
+
+			print("300 Redirect")
+			print("Location: /cgi-bin/school")
+			print()
+
+
+
+def get_student_atID(data, stdID): #DONE
+	#search for record and generate link
+	found = None
+	for i in data["students"]:
+		if i["id"] == stdID:
+			found = i
+			i["link"] = "http://127.0.0.1:8080/cgi-bin/school/students/" + str(i["id"])
+			break
+
+	if found == None:
+		error_404()
+	else:
+		#print out student from data dictionary with this id
+		print("Status: 200 OK")
+		print("Content-Type: text/html")
+		print()
+		print(json.dumps(found, indent=2))
+
+
+
+def put_update_student_atID(data, stdID): #DONE
+	#search students
+	found = False
+	for i in data["students"]:
+		#check if ID matches
+		if i["id"] == stdID:
+			#recieved data
+			new_rec = json.loads(sys.stdin.read())
+
+			#take given data, make sure it is correct and add to students
+			if "name" not in new_rec or type(new_rec["name"]) != str:
+				error_400()
+			else:
+				#str should be unecessary, but put in just to enforce str requirement for name
+				i["name"] = str(new_rec)
+				found = True
+				break
+	if found:
+		with open("BACKING_STORE", "w") as file:
+			file.write(json.dumps(data, indent=2))
+
+			print("300 Redirect")
+			print("Location: /cgi-bin/school")
+			print()
+	else:
+		error_404()
+
+
+
+def delete_student_atID(data, stdID): #DONE
+	#search students
+	found = False
+	for i in data["students"]:
+		#check if ID matches
+		if i["id"] == stdID:
+			found = True
+			#delete entry at id
+			data["students"].remove(i)
+			break
+
+	if found:
+		with open("BACKING_STORE", "w") as file:
+			file.write(json.dumps(data, indent=2))
+
+			print("300 Redirect")
+			print("Location: /cgi-bin/school")
+			print()
+	else:
+		error_404()
+
+
+
+def post_update_student_courses_atID(data, stdID):
+	#add course string to course list at specified student
+	#search students
+	found = False
+	for i in data["students"]:
+		if i["id"] == stdID:
+			found = True
+			#read in new data
+			new_rec = json.loads(sys.stdin.read())
+			#check if data already exists
+			if str(new_rec) in i["courses"]:
+				error_400()
+			else:
+				#check if course exists
+				#loop through
+				found_crs = False
+				for j in data["courses"]:
+					if j["id"] == new_rec:
+						found_crs = True
+						break
+				if found_crs == True:
+					i["courses"].append(str(new_rec))
+					break
+				else:
+					error_400()
+
+	if found:
+		with open("BACKING_STORE", "w") as file:
+			file.write(json.dumps(data, indent=2))
+
+			print("300 Redirect")
+			print("Location: /cgi-bin/school")
+			print()
+	else:
+		error_404()
+
+
+
+def delete_course_atID(data, crsID): #DONE 
+	#search courses
+	found = False
+	for i in data["courses"]:
+		#check if ID matches
+		if i["id"] == crsID:
+			found = True
+
+			#check if any student has this course
+			for j in data["students"]:
+				for crs in j["courses"]:
+					if crs == crsID:
+						error_400()
+
+			#delete entry at ID
+			data["courses"].remove(i)
+			break
+
+	if found:
+		with open("BACKING_STORE", "w") as file:
+			file.write(json.dumps(data, indent=2))
+
+			print("300 Redirect")
+			print("Location: /cgi-bin/school")
+			print()
+	else:
+		error_404()
+
+
+
+def main():
+	#sets the request method used
+	method = os.environ["REQUEST_METHOD"]
+
+	#open backing storage file: "file"
+	with open("BACKING_STORE") as file:
+
+		filesize = os.path.getsize("BACKING_STORE")
+
+		#if backing file is empty and are trying to access its contents, return a 404 error, otherwise continue
+		if filesize == 0 and method == "GET":
+			error_404()
+		else:
+			data = json.loads(file.read())
+
+	#setup path info
+	if "PATH_INFO" not in os.environ or os.environ["PATH_INFO"] == "/":
+		path = []
+		error_404()
+	else:
+		path_build = os.environ["PATH_INFO"].split("/")
+		path = [value for value in path_build if value != ""]
+
+	#conditions for each branch
+	if len(path) == 1:
+		if path[0] == "students":
+			if method == "GET":
+				get_all_students(data)
+			if method == "POST":
+				post_new_student(data)
+			else:
+				error_400()
+		elif path[0] == "courses":
+			if method == "GET":
+				get_all_courses(data)
+			if method == "POST":
+				post_new_course(data)
+		else:
+			error_404()
+
+	elif len(path) == 2:
+		if path[0] == "students":
+			if method == "GET":
+				get_student_atID(data, int(path[1]))
+			if method == "PUT":
+				put_update_student_atID(data, int(path[1]))
+			if method == "DELETE":
+				delete_student_atID(data, int(path[1]))
+			else:
+				error_400()
+		elif path[0] == "courses":
+			if method == "DELETE":
+				delete_course_atID(data, str(path[1]))
+			else:
+				error_400()
+		else:
+			error_404()
+
+	elif len(path) == 3:
+		if path[0] == "students":
+			if method == "POST":
+				post_update_student_courses_atID(data, int(path[1]))
+			else:
+				error_400()
+		else:
+			error_404()
+
+	else:
+		error_404()
+
+main()
